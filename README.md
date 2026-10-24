@@ -63,17 +63,6 @@ O banco é local e o arquivo SQLite é administrado pelo app. Não há servidor,
 5. Abra o Contaê novamente e retorne à lista. O registro precisa continuar lá com os valores salvos.
 6. Remova o item e confirme que ele deixa de aparecer, inclusive após reabrir o app.
 
-## Documentação em vídeo e prints
-
-A atividade exige evidência real do app funcionando. Os prints e vídeos precisam ser capturados pelo trio no emulador/aparelho; não são substituídos por imagens ilustrativas ou por este texto.
-
-Organizem os arquivos em `docs/evidencias/` (instruções e roteiro em [docs/evidencias/README.md](docs/evidencias/README.md)) e adicionem links abaixo após gravar e enviar os arquivos:
-
-- **Print:** tela com item cadastrado.
-- **Vídeo 1:** adicionar, editar e remover uma categoria.
-- **Vídeo 2:** adicionar uma despesa, fechar completamente o app, reabrir e mostrar que ela persiste.
-- **Print/vídeo:** detalhes abertos a partir de uma rota com ID.
-
 ## Reflexão do trio
 
 ### Qual foi a dificuldade na migração de memória para Room?
