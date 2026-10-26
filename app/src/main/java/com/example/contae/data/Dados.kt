@@ -13,10 +13,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/**
- * Cache observável da interface alimentado exclusivamente pelo Room.
- * Todas as consultas e mutações do banco são executadas em Dispatchers.IO.
- */
 object Dados {
     private const val TAG = "ContaêRoom"
     private lateinit var database: AppDatabase
@@ -172,14 +168,53 @@ object Dados {
         }
     }
 
-    fun salvarDespesa(despesa: Despesa) {
+    fun salvarDespesa(
+        despesa: Despesa,
+        aoConcluir: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
         scope.launch {
             try {
-                if (despesa.id == 0) database.despesaDao().inserir(despesa)
-                else database.despesaDao().atualizar(despesa)
+                if (!::database.isInitialized) {
+                    throw IllegalStateException(
+                        "Banco de dados não foi inicializado."
+                    )
+                }
+
+                val categoria = database.categoriaDao()
+                    .buscarPorId(despesa.categoriaId)
+
+                if (categoria == null) {
+                    throw IllegalArgumentException(
+                        "A categoria informada não existe."
+                    )
+                }
+
+                if (despesa.id == 0) {
+                    database.despesaDao().inserir(despesa)
+                } else {
+                    database.despesaDao().atualizar(despesa)
+                }
+
                 sincronizarListas()
+
+                withContext(Dispatchers.Main) {
+                    aoConcluir(
+                        true,
+                        "Despesa salva com sucesso!"
+                    )
+                }
+
+                Log.d(TAG, "Despesa salva: ${despesa.descricao}")
+
             } catch (e: Exception) {
                 Log.e(TAG, "Erro ao salvar despesa", e)
+
+                withContext(Dispatchers.Main) {
+                    aoConcluir(
+                        false,
+                        "Erro ao salvar: ${e.localizedMessage ?: "erro desconhecido"}"
+                    )
+                }
             }
         }
     }

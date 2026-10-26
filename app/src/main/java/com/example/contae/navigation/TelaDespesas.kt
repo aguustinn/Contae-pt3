@@ -19,11 +19,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachMoney
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -58,6 +61,7 @@ import com.example.contae.ui.theme.VerdeClaro
 import com.example.contae.ui.theme.VerdeEscuro
 import com.example.contae.ui.theme.VerdePrincipal
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TelaDespesas(navController: NavController) {
     LaunchedEffect(Unit) {
@@ -80,12 +84,14 @@ fun TelaDespesas(navController: NavController) {
         mutableStateOf("")
     }
 
+    var categoriasExpandidas by remember { mutableStateOf(false) }
+
     var despesaEditandoId by remember {
         mutableStateOf<Int?>(null)
     }
 
-    val despesasPagas = remember {
-        mutableStateOf(mutableSetOf<Int>())
+    var mensagem by remember {
+        mutableStateOf("")
     }
 
     Scaffold(
@@ -272,28 +278,52 @@ fun TelaDespesas(navController: NavController) {
                             modifier = Modifier.height(12.dp)
                         )
 
-                        OutlinedTextField(
-                            value = categoriaIdTexto,
-                            onValueChange = {
-                                categoriaIdTexto = it
-                            },
-
-                            modifier = Modifier.fillMaxWidth(),
-
-                            label = {
-                                Text("ID da categoria")
-                            },
-
-                            placeholder = {
-                                Text("Ex.: 1")
-                            },
-
-                            singleLine = true,
-
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Number
+                        ExposedDropdownMenuBox(
+                            expanded = categoriasExpandidas,
+                            onExpandedChange = { categoriasExpandidas = it }
+                        ) {
+                            val categoriaSelecionada = Dados.categorias.find {
+                                it.id.toString() == categoriaIdTexto
+                            }
+                            OutlinedTextField(
+                                value = categoriaSelecionada?.nome ?: "",
+                                onValueChange = {},
+                                readOnly = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor(),
+                                label = { Text("Categoria") },
+                                placeholder = { Text("Selecione uma categoria") },
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(
+                                        expanded = categoriasExpandidas
+                                    )
+                                },
+                                singleLine = true
                             )
-                        )
+                            ExposedDropdownMenu(
+                                expanded = categoriasExpandidas,
+                                onDismissRequest = { categoriasExpandidas = false }
+                            ) {
+                                Dados.categorias.forEach { categoria ->
+                                    DropdownMenuItem(
+                                        text = { Text(categoria.nome) },
+                                        onClick = {
+                                            categoriaIdTexto = categoria.id.toString()
+                                            categoriasExpandidas = false
+                                            mensagem = ""
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        if (Dados.categorias.isEmpty()) {
+                            Text(
+                                text = "Nenhuma categoria cadastrada. Cadastre uma na tela Categorias.",
+                                color = Color(0xFFD32F2F),
+                                fontSize = 12.sp
+                            )
+                        }
 
                         Spacer(
                             modifier = Modifier.height(12.dp)
@@ -324,89 +354,99 @@ fun TelaDespesas(navController: NavController) {
 
                         Button(
                             onClick = {
+                                val valorNumero = valor.trim()
+                                    .replace(",", ".")
+                                    .toDoubleOrNull()
 
-                                val valorNumero =
-                                    valor
-                                        .replace(",", ".")
-                                        .toDoubleOrNull()
+                                val categoriaId = categoriaIdTexto.trim()
+                                    .toIntOrNull()
 
-                                val categoriaId =
-                                    categoriaIdTexto.toIntOrNull()
-
-                                if (
-                                    descricao.isNotBlank() &&
-                                    valorNumero != null &&
-                                    valorNumero > 0 &&
-                                    categoriaId != null &&
-                                    Dados.categorias.any {
-                                        it.id == categoriaId
-                                    } &&
-                                    data.isNotBlank()
-                                ) {
-
-                                    val id = despesaEditandoId
-                                    if (id == null) {
-                                        Dados.salvarDespesa(
-                                            Despesa(
-                                                descricao = descricao.trim(),
-                                                valor = valorNumero,
-                                                categoriaId = categoriaId,
-                                                data = data.trim()
-                                            )
-                                        )
-                                    } else {
-                                        Dados.salvarDespesa(
-                                            Despesa(
-                                                id = id,
-                                                descricao = descricao.trim(),
-                                                valor = valorNumero,
-                                                categoriaId = categoriaId,
-                                                data = data.trim()
-                                            )
-                                        )
+                                when {
+                                    descricao.isBlank() -> {
+                                        mensagem = "Informe a descrição da despesa."
                                     }
 
-                                    descricao = ""
-                                    valor = ""
-                                    data = ""
-                                    categoriaIdTexto = ""
-                                    despesaEditandoId = null
+                                    valorNumero == null || valorNumero <= 0 -> {
+                                        mensagem = "Informe um valor válido maior que zero."
+                                    }
+
+                                    categoriaId == null -> {
+                                        mensagem = "Selecione uma categoria."
+                                    }
+
+                                    Dados.categorias.none { it.id == categoriaId } -> {
+                                        mensagem = "Essa categoria não existe mais. Selecione outra."
+                                    }
+
+                                    data.isBlank() -> {
+                                        mensagem = "Informe a data da despesa."
+                                    }
+
+                                    else -> {
+                                        mensagem = "Salvando despesa..."
+
+                                        val despesa = Despesa(
+                                            id = despesaEditandoId ?: 0,
+                                            descricao = descricao.trim(),
+                                            valor = valorNumero,
+                                            categoriaId = categoriaId,
+                                            data = data.trim()
+                                        )
+
+                                        Dados.salvarDespesa(despesa) { sucesso, resultado ->
+                                            mensagem = resultado
+
+                                            if (sucesso) {
+                                                descricao = ""
+                                                valor = ""
+                                                data = ""
+                                                categoriaIdTexto = ""
+                                                despesaEditandoId = null
+                                            }
+                                        }
+                                    }
                                 }
                             },
-
                             modifier = Modifier.fillMaxWidth(),
-
                             shape = RoundedCornerShape(14.dp),
-
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = VerdePrincipal
                             )
                         ) {
-
                             Icon(
-                                imageVector =
-                                    if (despesaEditandoId == null) {
-                                        Icons.Filled.AttachMoney
-                                    } else {
-                                        Icons.Filled.Save
-                                    },
-
+                                imageVector = if (despesaEditandoId == null) {
+                                    Icons.Filled.AttachMoney
+                                } else {
+                                    Icons.Filled.Save
+                                },
                                 contentDescription = null
                             )
 
-                            Spacer(
-                                modifier = Modifier.width(8.dp)
-                            )
+                            Spacer(modifier = Modifier.width(8.dp))
 
                             Text(
-                                text =
-                                    if (despesaEditandoId == null) {
-                                        "Adicionar despesa"
-                                    } else {
-                                        "Salvar alterações"
-                                    },
-
+                                text = if (despesaEditandoId == null) {
+                                    "Adicionar despesa"
+                                } else {
+                                    "Salvar alterações"
+                                },
                                 fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        if (mensagem.isNotBlank()) {
+                            Text(
+                                text = mensagem,
+                                color = if (
+                                    mensagem.startsWith("Erro") ||
+                                    mensagem.startsWith("Informe") ||
+                                    mensagem.startsWith("Essa")
+                                ) {
+                                    Color(0xFFD32F2F)
+                                } else {
+                                    VerdePrincipal
+                                },
+                                modifier = Modifier.padding(top = 8.dp)
                             )
                         }
 
@@ -424,6 +464,7 @@ fun TelaDespesas(navController: NavController) {
                                     data = ""
                                     categoriaIdTexto = ""
                                     despesaEditandoId = null
+                                    mensagem = ""
                                 },
 
                                 modifier = Modifier.fillMaxWidth(),
@@ -500,9 +541,6 @@ fun TelaDespesas(navController: NavController) {
                         it.id == despesa.categoriaId
                     }
 
-                val paga =
-                    despesasPagas.value.contains(despesa.id)
-
                 Card(
                     onClick = {
 
@@ -523,9 +561,7 @@ fun TelaDespesas(navController: NavController) {
                     shape = RoundedCornerShape(20.dp),
 
                     colors = CardDefaults.cardColors(
-                        containerColor =
-                            if (paga) CardVerde
-                            else Branco
+                        containerColor = Branco
                     ),
 
                     elevation = CardDefaults.cardElevation(
@@ -657,45 +693,6 @@ fun TelaDespesas(navController: NavController) {
 
                                             tint =
                                                 VerdePrincipal
-                                        )
-                                    }
-
-                                    IconButton(
-                                        onClick = {
-
-                                            val novoConjunto =
-                                                despesasPagas
-                                                    .value
-                                                    .toMutableSet()
-
-                                            if (paga) {
-                                                novoConjunto.remove(
-                                                    despesa.id
-                                                )
-                                            } else {
-                                                novoConjunto.add(
-                                                    despesa.id
-                                                )
-                                            }
-
-                                            despesasPagas.value =
-                                                novoConjunto
-                                        }
-                                    ) {
-
-                                        Icon(
-                                            imageVector =
-                                                Icons.Filled.Check,
-
-                                            contentDescription =
-                                                "Marcar como paga",
-
-                                            tint =
-                                                if (paga) {
-                                                    VerdePrincipal
-                                                } else {
-                                                    Cinza
-                                                }
                                         )
                                     }
 
